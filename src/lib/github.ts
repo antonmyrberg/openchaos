@@ -1,3 +1,6 @@
+import { dateTitleSort } from "@/utils/dateTitleSort";
+import { fizzBuzzMap } from "@/utils/fizzBuzzMap";
+
 export interface PullRequest {
   number: number;
   title: string;
@@ -67,7 +70,11 @@ export async function getOpenPRs(): Promise<PullRequest[]> {
   );
 
   // Sort by votes descending
-  return prsWithVotes.sort((a, b) => b.votes - a.votes);
+  return prsWithVotes
+  .sort((a, b) => b.votes - a.votes)
+  .sort(dateTitleSort)
+  // Make sure to pass the coding interview
+  .map(fizzBuzzMap);
 }
 
 async function getPRVotes(
