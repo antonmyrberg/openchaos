@@ -72,9 +72,9 @@ export async function getOpenPRs(): Promise<PullRequest[]> {
   // Sort by votes descending
   return prsWithVotes
   .sort((a, b) => b.votes - a.votes)
-  .sort(dateTitleSort)
   // Make sure to pass the coding interview
-  .map(fizzBuzzMap);
+  .map(fizzBuzzMap)
+  .sort(dateTitleSort);
 }
 
 async function getPRVotes(
