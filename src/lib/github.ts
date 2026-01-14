@@ -37,22 +37,41 @@ function getHeaders(accept: string): Record<string, string> {
 export async function getOpenPRs(): Promise<PullRequest[]> {
   const [owner, repo] = GITHUB_REPO.split("/");
 
-  const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/pulls?state=open`,
-    {
-      headers: getHeaders("application/vnd.github.v3+json"),
-      next: { revalidate: 300 }, // Cache for 5 minutes
-    }
-  );
+  let allPRs: GitHubPR[] = [];
+  let page = 1;
 
-  if (!response.ok) {
-    if (response.status === 403) {
-      throw new Error("Rate limited by GitHub API");
+  while (true) {
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=100&page=${page}`,
+      {
+        headers: getHeaders("application/vnd.github.v3+json"),
+        next: { revalidate: 300 }, // Cache for 5 minutes
+      }
+    );
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error("Rate limited by GitHub API");
+      }
+      throw new Error(`GitHub API error: ${response.status}`);
     }
-    throw new Error(`GitHub API error: ${response.status}`);
+
+    const prs: GitHubPR[] = await response.json();
+
+    if (prs.length === 0) {
+      break;
+    }
+
+    allPRs = allPRs.concat(prs);
+
+    if (prs.length < 100) {
+      break;
+    }
+
+    page++;
   }
 
-  const prs: GitHubPR[] = await response.json();
+  const prs = allPRs;
 
   // Fetch reactions for each PR
   const prsWithVotes = await Promise.all(
@@ -66,7 +85,7 @@ export async function getOpenPRs(): Promise<PullRequest[]> {
         votes,
         createdAt: pr.created_at,
       };
-    })
+    }),
   );
 
   // Sort by votes descending
@@ -77,11 +96,7 @@ export async function getOpenPRs(): Promise<PullRequest[]> {
   .sort(dateTitleSort);
 }
 
-async function getPRVotes(
-  owner: string,
-  repo: string,
-  prNumber: number
-): Promise<number> {
+async function getPRVotes(owner: string, repo: string, prNumber: number): Promise<number> {
   let allReactions: GitHubReaction[] = [];
   let page = 1;
 
@@ -91,7 +106,7 @@ async function getPRVotes(
       {
         headers: getHeaders("application/vnd.github.squirrel-girl-preview+json"),
         next: { revalidate: 300 },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -113,5 +128,5 @@ async function getPRVotes(
     page++;
   }
 
-  return allReactions.filter((r) => r.content === "+1").length;
+  return allReactions.filter((r) => r.content === "+1").length - allReactions.filter((r) => r.content === "-1").length;
 }
